@@ -114,3 +114,7 @@ Resources:
         Fn::Base64: |
          #!/bin/bash
           echo "Hello World!"
+      KeyName: MyKeyPair
+      Tags:
+        - Key: Name
+          Value: Test EC2
