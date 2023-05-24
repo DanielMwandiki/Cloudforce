@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: a Cloud Formation template that provisions a VPC with its necessary components and an EC2 instance within the VPC.
+Parameters:
+  VPCCIDR: 
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1CIDR:
+    Type: String
+    Default: 10.0.0.0/24
+  
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.micro
+    Description: Enter instance size
+ 
+  AMI:
+    Type: String
+    Default: ami-0e0820ad173f20fbb
+    Description: Amazon Linux AMI
+
+Resources:
+#VPC
+  VPC: 
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true  
+      Tags: 
+        - Key: Name 
+          Value: Test VPC
+
+#Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Test IGW
+  
+#Attach IGW to VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway 
+      VpcId: !Ref VPC 
+
+#Create Public subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC 
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name 
+          Value: Public Subnet
+
+#Create  Route Table
+  myRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Public Route Table
+# Add Public Route
+  PublicRoute:
+    Type: AWS::EC2::Route 
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref myRouteTable
+
+#Associate the Public Subnets 
+  SubnetRouteTableAssociation: 
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet 
+      RouteTableId: !Ref myRouteTable
+
+#Create Security Group
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 
+      Tags: 
+        - Key: Name 
+          Value: Instance Security Group 
+
+#Create EC2 Instance
+  Ec2Instance: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: !Ref AMI 
+      InstanceType: !Ref InstanceTypeParameter 
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds: 
+        - !Ref InstanceSecurityGroup 
+      UserData:
+        Fn::Base64: |
+         #!/bin/bash
+          echo "Hello World!"
