@@ -52,7 +52,6 @@ Resources:
     Properties:
       VpcId: !Ref VPC 
       CidrBlock: !Ref PublicSubnet1CIDR
-      MapPublicIpOnLaunch: true
       AvailabilityZone: ap-northeast-1a
       Tags:
         - Key: Name 
@@ -66,9 +65,11 @@ Resources:
       Tags:
       - Key: Name
         Value: Public Route Table
+
 # Add Public Route
   PublicRoute:
-    Type: AWS::EC2::Route 
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
     Properties: 
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
@@ -89,17 +90,18 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
+          FromPort: 22
+          ToPort: 22
           CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0 
-      Tags: 
-        - Key: Name 
-          Value: Instance Security Group 
+          CidrIp: 0.0.0.0/0
+#Elastic IP
+  MyElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+       Domain: vpc
 
 #Create EC2 Instance
   Ec2Instance: 
@@ -110,11 +112,21 @@ Resources:
       SubnetId: !Ref PublicSubnet
       SecurityGroupIds: 
         - !Ref InstanceSecurityGroup 
+      KeyName: trail
       UserData:
-        Fn::Base64: |
-         #!/bin/bash
-          echo "Hello World!"
-      KeyName: MyKeyPair
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update
+          apt-get install -y apache2
+          systemctl enable apache2
+          systemctl start apache2
       Tags:
         - Key: Name
           Value: Test EC2
+
+#Elastic IP Association  
+  MyElasticIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt MyElasticIP.AllocationId
+      InstanceId: !Ref Ec2Instance
